@@ -1,0 +1,45 @@
+# Central configuration for the Predictive Maintenance project.
+# Every script reads from here, so you change values in ONE place.
+
+project_name: predictive-maintenance
+
+paths:
+  raw_data: data/raw/sensor_data.csv
+  train_data: data/processed/train.csv
+  test_data: data/processed/test.csv
+  new_data: data/raw/new_sensor_data.csv        # "fresh" production data used for drift checks / retraining
+  model: models/model.joblib
+  model_metadata: models/model_metadata.json
+  reference_data: models/reference_data.csv     # baseline for drift detection
+  reports_dir: reports
+  logs_dir: logs
+  prediction_log: logs/prediction_log.csv
+
+data_generation:
+  n_samples: 10000
+  random_state: 42
+
+training:
+  test_size: 0.2
+  random_state: 42
+  cv_folds: 3
+  tuning_iterations: 10
+  primary_metric: f1             # metric used to pick the best model
+
+mlflow:
+  tracking_uri: sqlite:///mlflow.db
+  experiment_name: predictive-maintenance
+  registered_model_name: machine-failure-classifier
+
+risk_thresholds:                 # failure probability -> risk level
+  medium: 0.20
+  high: 0.50
+  critical: 0.80
+
+drift:
+  psi_threshold: 0.2             # PSI > 0.2 = significant shift for a feature
+  ks_pvalue_threshold: 0.05
+  drift_share_threshold: 0.3     # dataset drift if >30% of features drifted
+
+retraining:
+  min_f1_improvement: -0.01      # new model is promoted if it's not worse than old by more than 0.01

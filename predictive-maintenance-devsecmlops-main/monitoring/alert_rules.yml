@@ -1,0 +1,30 @@
+# Prometheus alert rules (visible at http://localhost:9090/alerts)
+groups:
+  - name: predictive-maintenance
+    rules:
+      - alert: ApiDown
+        expr: up{job="predictive-maintenance-api"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "Prediction API is down"
+
+      - alert: HighErrorRate
+        expr: sum(rate(api_requests_total{status=~"5.."}[5m])) / sum(rate(api_requests_total[5m])) > 0.05
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "More than 5% of API requests are failing"
+
+      - alert: SlowPredictions
+        expr: histogram_quantile(0.95, sum(rate(api_request_latency_seconds_bucket{endpoint="/predict"}[5m])) by (le)) > 0.5
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "95th percentile prediction latency above 500 ms"
+
+      - alert: CriticalMachinesSpike
+        expr: increase(predictions_total{risk_level="CRITICAL"}[10m]) > 5
+        labels: {severity: critical}
+        annotations:
+          summary: "More than 5 machines predicted CRITICAL in 10 minutes"

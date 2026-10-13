@@ -1,0 +1,67 @@
+# Kubernetes deployment (optional - for showing infrastructure-as-code).
+# Try it locally with minikube or Docker Desktop's Kubernetes:
+#   kubectl create secret generic pm-secrets --from-literal=API_KEY=your-key
+#   kubectl apply -f k8s/deployment.yaml
+#   kubectl port-forward svc/pm-api 8000:80
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pm-api
+  labels: {app: pm-api}
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: pm-api}
+  template:
+    metadata:
+      labels: {app: pm-api}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics/"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+      containers:
+        - name: api
+          image: ghcr.io/YOUR_GITHUB_USERNAME/predictive-maintenance:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef: {name: pm-secrets, key: API_KEY}
+          resources:
+            requests: {cpu: 250m, memory: 512Mi}
+            limits: {cpu: "1", memory: 1Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false   # the app can retrain itself and write new model files
+            capabilities: {drop: ["ALL"]}
+          volumeMounts:
+            - {name: logs, mountPath: /app/logs}
+            - {name: reports, mountPath: /app/reports}
+            - {name: tmp, mountPath: /tmp}
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 20
+            periodSeconds: 20
+      volumes:
+        - {name: logs, emptyDir: {}}
+        - {name: reports, emptyDir: {}}
+        - {name: tmp, emptyDir: {}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pm-api
+spec:
+  selector: {app: pm-api}
+  ports:
+    - port: 80
+      targetPort: 8000
